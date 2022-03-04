@@ -36,19 +36,21 @@ async fn main() -> web3::Result<()> {
 
     // load acount from .env file
     web3m.load_accounts(
-            &env::var("ACCOUNT_ADDRESS").unwrap(),
-            &env::var("PRIVATE_TEST_KEY").unwrap(),
+            &env::var("ACCOUNT_ADDRESS_OWNER").unwrap(),
+            &env::var("PRIVATE_TEST_KEY_OWNER").unwrap(),
         )
         .await;
 
-    // init contract
-    // usuario1
-    let contract_abi = include_bytes!("../abi/TokenAbi.json");
-    let contract_address = "0x7ef95a0FEE0Dd31b22626fA2e10Ee6A223F8a684";
-    let contract_instance: Contract<Http> = web3m
-        .instance_contract(contract_address, contract_abi)
+    // instance token contract
+    let token_contract_abi = include_bytes!("../abi/TokenAbi.json");
+    let token_contract_address = "0x4097BD0841dcc07787Ff793Ff21a28DCBa17BD61";
+    let token_contract_instance: Contract<Http> = web3m
+        .instance_contract(
+            token_contract_address,
+            token_contract_abi)
         .await;
 
+    // instance router contract
     let router_address = "0x9Ac64Cc6e4415144C455BD8E4837Fea55603e5c3";
     let router_abi = include_bytes!("../abi/RouterAbi.json");
     let router_instance: Contract<Http> = web3m.instance_contract(router_address, router_abi).await;
@@ -57,16 +59,36 @@ async fn main() -> web3::Result<()> {
     let account:H160 = web3m.get_first_loaded_account();
     let balance_of: Uint = web3m
         .query_contract(
-            contract_instance.clone(),
+            token_contract_instance.clone(),
             "balanceOf",
             account)
         .await;
 
     println!("balance_of tokens: {:?}", balance_of);
+
+    web3m.approve_erc20_token(token_contract_instance, router_address, "100000").await;
+    //web3m.swap_tokens_for_tokens()
     // -------------------------
 
-    let value = "10000000000000000";
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    /** SWAP OK */
+    /*
+    let value = "10000000000000000";
     let token_a = "0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd";
     let token_b = "0x7ef95a0FEE0Dd31b22626fA2e10Ee6A223F8a684";
     let path_address: Vec<&str> = vec![token_a, token_b];
@@ -82,6 +104,9 @@ async fn main() -> web3::Result<()> {
         &env::var("EXPLORER").unwrap(),
         tx_id
     );
+    */
+
+
     //     println!("Elapsed: {:.2?}", elapsed);
     //web3m.sent_erc20_token( contract_instance,contract_address, value).await;
 

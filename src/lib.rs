@@ -137,6 +137,65 @@ impl Web3Manager {
         return result;
     }
 
+    pub async fn swap_tokens_for_tokens(
+        &mut self,
+        contract_instance: Contract<Http>,
+        tokenAmount: &str,
+        pairs: Vec<&str>,
+    ) -> H256 {
+        let contract_function = "swapETHForExactTokens".to_string();
+        let deadline = self.generate_deadline();
+
+        let mut addresses = Vec::new();
+        let mut addresses2 = Vec::new();
+        let mut addresses3 = Vec::new();
+
+        for pair in pairs {
+            addresses.push(Address::from_str(pair).unwrap());
+            addresses2.push(Address::from_str(pair).unwrap());
+            addresses3.push(Address::from_str(pair).unwrap());
+        }
+
+        let amountIn: U256 = U256::from_dec_str(tokenAmount).unwrap();
+        //println!("amountIn: {}", amountIn);
+        let parameterIn = (amountIn, addresses);
+        let amount_in_min: Vec<Uint> = self.query_contract(contract_instance.clone(), "getAmountsIn", parameterIn).await;
+        //println!("amount_in_min[0]: {:?}", wei_to_eth(amount_in_min[0]));
+        //println!("amount_in_min[1]: {:?}", wei_to_eth(amount_in_min[1]));
+        //println!("");
+
+        let amountOut: U256 = U256::from_dec_str(tokenAmount).unwrap();
+        //println!("amountOut: {}", amountOut);
+        let parameterOut = (amountOut, addresses2);
+        let amount_out_min: Vec<Uint> = self.query_contract(contract_instance.clone(), "getAmountsOut", parameterOut).await;
+        //println!("amount_out_min[0]: {:?}", wei_to_eth(amount_out_min[0]));
+        //println!("amount_out_min[1]: {:?}", wei_to_eth(amount_out_min[1]));
+        //println!("");
+
+        let slipage = 2;
+        //println!("slipage: {:?} %", slipage);
+
+        let min_amount = U256::from(amount_out_min[1].as_u128());
+        //println!("min_amount: {:?}", wei_to_eth(min_amount));
+        //println!("");
+
+        let min_amount_less_slipagge = min_amount - ((min_amount * slipage) / 100);
+        //println!("min_amount_less_slipagge: {:?}", wei_to_eth(min_amount_less_slipagge));
+        //println!("");
+
+        let parameters2 = (
+            min_amount_less_slipagge,
+            addresses3,
+            self.get_first_loaded_account(),
+            deadline + 600,
+        );
+
+        //println!("parameters2: {:?}", parameters2);
+
+        let result: H256 = self.sign_and_send_tx(contract_instance.clone(), contract_function, parameters2, amount_out_min[0].to_string().as_str()).await;
+        return result;
+    }
+
     pub async fn get_out_estimated_tokens_for_tokens(
         &mut self,
         contract_instance: Contract<Http>,
@@ -306,8 +365,7 @@ impl Web3Manager {
         &mut self,
         transact_obj: TransactionParameters,
     ) -> SignedTransaction {
-        let private_key: secp256k1::SecretKey =
-            SecretKey::from_str(&env::var("PRIVATE_TEST_KEY").unwrap()).unwrap();
+        let private_key: secp256k1::SecretKey = SecretKey::from_str(&env::var("PRIVATE_TEST_KEY_OWNER").unwrap()).unwrap();
 
         let signed_transaction: SignedTransaction = self
             .web3http
@@ -451,13 +509,12 @@ impl Web3Manager {
             .await
             .unwrap();
 
-        /*
         println!(
             "Transaction successful with hash: {}{:?}",
             &env::var("EXPLORER").unwrap(),
             result
         );
-        */
+
         self.current_nonce = self.current_nonce + 1; // todo, check pending nonce dont works
         return result;
     }
