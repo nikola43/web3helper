@@ -19,6 +19,7 @@ use serde::{Deserialize, Serialize};
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
 use std::convert::{From, TryFrom};
+use std::error::Error;
 use std::str::FromStr;
 use std::time::SystemTime;
 use web3::api::SubscriptionStream;
@@ -354,7 +355,7 @@ impl Web3Manager {
         token_amount: U256,
         pairs: &[&str],
         slippage: usize,
-    ) -> Result<H256, web3::Error> {
+    ) -> Result<H256, Box<dyn Error>> {
         let contract_function = "swapTokensForExactTokens";
 
         let router_abi = include_bytes!("../abi/PancakeRouterAbi.json");
@@ -425,7 +426,7 @@ impl Web3Manager {
         router_address: &str,
         token_amount: U256,
         pairs: &[&str],
-    ) -> Result<H256, web3::Error> {
+    ) -> Result<H256, Box<dyn Error>> {
         let contract_function: &str = "swapExactTokensForTokensSupportingFeeOnTransferTokens";
 
         let router_abi = include_bytes!("../abi/PancakeRouterAbi.json");
@@ -466,7 +467,7 @@ impl Web3Manager {
         token_address: &str,
         eth_amount: U256,
         slippage: usize,
-    ) -> Result<H256, web3::Error> {
+    ) -> Result<H256, Box<dyn Error>> {
         let mut router_abi_path = "../abi/PancakeRouterAbi.json";
         let mut contract_function: &str = "swapExactETHForTokens";
         let mut wbnb_address = "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c";
@@ -831,7 +832,7 @@ impl Web3Manager {
         func: &str,
         params: &P,
         value: U256,
-    ) -> Result<H256, web3::Error>
+    ) -> Result<H256, Box<dyn Error>>
     where
         P: Tokenize,
     {
@@ -853,7 +854,7 @@ impl Web3Manager {
 
         let mut estimated_tx_gas = U256::from_dec_str("0").unwrap();
         if gas_estimation_result.is_err() {
-            return Err(gas_estimation_result.err().unwrap());
+            return Err(Box::new(gas_estimation_result.err().unwrap()));
         } else {
             estimated_tx_gas = gas_estimation_result.unwrap();
         }
@@ -880,7 +881,7 @@ impl Web3Manager {
         nonce = self.get_current_nonce();
         println!("current_nonce after: {:?}", nonce);
 
-        return tx_result;
+        return Ok(tx_result.unwrap());
     }
 
     async fn sign_and_send_transaction(
