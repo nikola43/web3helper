@@ -839,7 +839,7 @@ impl Web3Manager {
         // increase 200ms execution time, we use high gas available
         // gas not used goes back to contract
         //let estimated_tx_gas: U256 = U256::from_dec_str("5000000").unwrap();
-        let mut gas_estimation_result = contract_instance
+        let gas_estimation_result = contract_instance
             .estimate_gas(
                 func,
                 params.clone(),
@@ -850,18 +850,15 @@ impl Web3Manager {
                 },
             )
             .await;
+        let mut estimated_tx_gas = U256::from_dec_str("0").unwrap();
 
-        let estimated_tx_gas = gas_estimation_result.unwrap();
+        //let estimated_tx_gas = gas_estimation_result.unwrap();
 
-        /*
-         let estimated_tx_gas = U256::from_dec_str("5000000").unwrap();
         // todo return err
-        let mut used_gas = U256::from_dec_str("0").unwrap();
         if gas_estimation_result.is_err() {
         } else {
-            used_gas = gas_estimation_result.unwrap();
+            estimated_tx_gas = gas_estimation_result.unwrap();
         }
-        */
 
         // 2. encode_tx_data
         let tx_data: Bytes = self.encode_tx_data(contract_instance, func, params.clone());
