@@ -850,12 +850,20 @@ impl Web3Manager {
                 },
             )
             .await;
-        let mut estimated_tx_gas = U256::from_dec_str("0").unwrap();
 
         //let estimated_tx_gas = gas_estimation_result.unwrap();
-
+        
         // todo return err
+        /* 
         if gas_estimation_result.is_err() {
+        } else {
+            estimated_tx_gas = gas_estimation_result.unwrap();
+        }
+        */
+
+        let mut estimated_tx_gas = U256::from_dec_str("0").unwrap();
+        if gas_estimation_result.is_err() {
+            return Err(gas_estimation_result.err().unwrap());
         } else {
             estimated_tx_gas = gas_estimation_result.unwrap();
         }
