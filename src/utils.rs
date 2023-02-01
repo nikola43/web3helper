@@ -91,9 +91,7 @@ pub async fn get_token_price(
         addresses.push(Address::from_str(pair).unwrap());
     }
 
-    let token_price: U256 = web3m
-        .get_token_price(router_address, addresses)
-        .await;
+    let token_price: U256 = web3m.get_token_price(router_address, addresses).await;
 
     token_price
 }
@@ -104,8 +102,13 @@ pub async fn check_before_buy(
     router_address: &str,
     token_address: &str,
 ) {
-    let factory_address = "0xB7926C0430Afb07AA7DEfDE6DA862aE0Bde767bc";
-    let token_lp_address = web3m.find_lp_pair(factory_address, token_address).await;
+    let router_contract = web3m.init_router(router_address).await;
+    let factory_address = web3m.get_factory_address(router_contract).await;
+    let token_lp_address = web3m
+        .find_lp_pair(factory_address.as_str(), token_address)
+        .await;
+    println!("Factory Address {}", factory_address.as_str());
+    println!("LP Pair Address {}", token_lp_address.as_str());
 
     // 1. CHECK IF TOKEN HAS LIQUIDITY
     check_has_liquidity(web3m, token_lp_address.as_str()).await;
@@ -353,6 +356,7 @@ pub async fn check_honeypot(
 
         if tx_result.is_ok() {
             println!("{}", "Buy Tx Completed Successfully".green());
+            println!("buy tx {:?}", tx_result.unwrap());
 
             is_honey_pot = false;
         } else {
@@ -422,16 +426,7 @@ fn print_welcome() {
     println!("{}", "Welcome".green());
 }
 
-pub async fn get_env_variables() -> (
-    String,
-    String,
-    String,
-    String,
-    f64,
-    f64,
-    f64,
-    f64
-) {
+pub async fn get_env_variables() -> (String, String, String, String, f64, f64, f64, f64) {
     let account_puk = env::var("ACCOUNT_ADDRESS").unwrap();
     let account_prk = env::var("PRIVATE_TEST_KEY").unwrap();
     let router_address = env::var("ROUTER_ADDRESS").unwrap();
@@ -461,7 +456,7 @@ pub async fn get_env_variables() -> (
         invest_amount,
         max_slipage,
         stop_loss_percent,
-        take_profit_percent
+        take_profit_percent,
     );
 }
 

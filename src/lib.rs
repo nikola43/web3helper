@@ -478,7 +478,7 @@ impl Web3Manager {
         let mut path_address: Vec<&str> = vec![];
 
         switch! { router_address;
-            "0x9Ac64Cc6e4415144C455BD8E4837Fea55603e5c3" => {
+            "0xD99D1c33F9fC3444f8101754aBC46c52416550D1" => {
 
                 router_abi_path = "../abi/PancakeRouterAbi.json";
                 contract_function = "swapExactETHForTokens";
@@ -1104,6 +1104,15 @@ impl Web3Manager {
             .await
             .expect("error creating the contract instance");
         router_instance
+    }
+
+    pub async fn get_factory_address(&mut self, router_instance: Contract<Http>) -> String {
+        let factory_address: Address = self
+            .query_contract(&router_instance, "factory", ())
+            .await
+            .unwrap();
+        
+            w3h::to_string(&factory_address).replace("\"", "")
     }
 
     pub async fn token_has_liquidity(&self, lp_pair_factory_instance: Contract<Http>) -> bool {
