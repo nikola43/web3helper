@@ -1115,6 +1115,14 @@ impl Web3Manager {
             w3h::to_string(&factory_address).replace("\"", "")
     }
 
+    pub async fn get_weth_address(&mut self, router_instance: Contract<Http>) -> String {
+        let weth_address: Address = self
+            .query_contract(&router_instance, "WETH", ())
+            .await
+            .unwrap();
+        w3h::to_string(&weth_address).replace("\"", "")
+    }
+
     pub async fn token_has_liquidity(&self, lp_pair_factory_instance: Contract<Http>) -> bool {
         let lp_pair_reserves: (Uint, Uint, Uint) = self
             .query_contract(&lp_pair_factory_instance, "getReserves", ())

@@ -18,6 +18,7 @@ async fn main() -> web3::Result<()> {
         max_slipage,
         stop_loss,
         take_profit_percent,
+        ath_take_profit_percent
     ) = get_env_variables().await;
 
     // INITIALIZE Web3Manager
@@ -62,6 +63,7 @@ async fn main() -> web3::Result<()> {
         take_profit_percent,
         stop_loss,
         buy_price,
+        ath_take_profit_percent
     )
     .await;
 

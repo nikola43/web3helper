@@ -194,6 +194,7 @@ pub async fn do_real_sell(
     take_profit_pencent: f64,
     stop_loss_percent: f64,
     buy_price: U256,
+    ath_take_profit_percent: f64,
 ) -> bool {
     let mut sell_tx_ok: bool = false;
 
@@ -224,7 +225,7 @@ pub async fn do_real_sell(
         }
 
         // CHECK IF TOKEN PERCENT HITS ATH TAKE PROFIT
-        if ath_price_change_percent < -10.0 {
+        if ath_price_change_percent < ath_take_profit_percent {
             price_hit_take_profit_ath = true
         }
 
@@ -395,7 +396,10 @@ pub async fn sell_all(
     token_address: &str,
 ) {
     let mut sell_ok: bool = false;
-    do_approve(web3m, token_address, router_address, account).await;
+    //do_approve(web3m, token_address, router_address, account).await;
+    let router_contract = web3m.init_router(router_address).await;
+
+    let weth_address = web3m.get_weth_address(router_contract).await;
 
     while !sell_ok {
         let token_balance = web3m.get_token_balance(token_address, account).await;
@@ -403,7 +407,7 @@ pub async fn sell_all(
 
         let path_address: Vec<&str> = vec![
             token_address,
-            "0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd", // BNB
+            weth_address.as_str(),
         ];
 
         let tx_result = web3m
@@ -425,11 +429,7 @@ pub async fn sell_all(
     }
 }
 
-fn print_welcome() {
-    println!("{}", "Welcome".green());
-}
-
-pub async fn get_env_variables() -> (String, String, String, String, f64, f64, f64, f64) {
+pub async fn get_env_variables() -> (String, String, String, String, f64, f64, f64, f64, f64) {
     let account_puk = env::var("ACCOUNT_ADDRESS").unwrap();
     let account_prk = env::var("PRIVATE_TEST_KEY").unwrap();
     let router_address = env::var("ROUTER_ADDRESS").unwrap();
@@ -440,6 +440,9 @@ pub async fn get_env_variables() -> (String, String, String, String, f64, f64, f
     let take_profit_percent = env::var("TAKE_PROFIT").unwrap().parse::<f64>().unwrap();
     stop_loss_percent = -stop_loss_percent;
 
+    let mut ath_take_profit_percent = env::var("ATH_TAKE_PROFIT").unwrap().parse::<f64>().unwrap();
+    ath_take_profit_percent = -ath_take_profit_percent;
+
     println!("--- ENVIRONMENT VARIABLES ---");
     println!("account_puk {}", account_puk);
     println!("account_prk {}", account_prk);
@@ -449,6 +452,7 @@ pub async fn get_env_variables() -> (String, String, String, String, f64, f64, f
     println!("max_slipage {}", max_slipage);
     println!("stop_loss_percent {}", stop_loss_percent);
     println!("take_profit_percent {}", take_profit_percent);
+    println!("ath_take_profit_percent {}", ath_take_profit_percent);
     println!("--- ENVIRONMENT VARIABLES ---\n");
 
     return (
@@ -460,6 +464,7 @@ pub async fn get_env_variables() -> (String, String, String, String, f64, f64, f
         max_slipage,
         stop_loss_percent,
         take_profit_percent,
+        ath_take_profit_percent,
     );
 }
 
