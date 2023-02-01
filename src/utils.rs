@@ -213,14 +213,17 @@ pub async fn do_real_sell(
         let ath_price_change_percent =
             calc_price_change_percent(wei_to_eth(token_ath_price, 18), wei_to_eth(token_price, 18));
 
+        // CHECK IF TOKEN PRICE IS HIGHER THAN LAST PRICE
         if token_price > last_token_price {
             last_token_price = token_price;
         }
 
+        // CHECK IF TOKEN PRICE IS HIGHER THAN ATH PRICE
         if token_price > token_ath_price {
             token_ath_price = token_price;
         }
 
+        // CHECK IF TOKEN PERCENT HITS ATH TAKE PROFIT
         if ath_price_change_percent < -10.0 {
             price_hit_take_profit_ath = true
         }
@@ -272,7 +275,7 @@ pub async fn do_real_sell(
             sell_tx_ok = true;
         }
     }
-    true
+    sell_tx_ok
 }
 
 pub async fn do_real_buy(
