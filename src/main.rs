@@ -21,7 +21,11 @@ pub struct BotConfig {
 async fn main() -> web3::Result<()> {
     dotenv::dotenv().ok();
 
-    let file = std::fs::File::open("config.json").unwrap();
+    // GET FILENAME FROM ARGUMENTS
+    let args: Vec<String> = std::env::args().collect();
+    let filename = args.get(2).unwrap();
+
+    let file = std::fs::File::open(filename).unwrap();
 
     // LOAD CONFIG FROM JSON FILE
     let config: BotConfig = serde_json::from_reader(file).unwrap();
