@@ -35,7 +35,7 @@ pub async fn check_has_liquidity(web3m: &mut Web3Manager, token_lp_address: &str
         has_liquidity = web3m.token_has_liquidity(lp_pair_instance).await;
 
         let now = Utc::now();
-        let (is_pm, hour) = now.hour12();
+        let (_, hour) = now.hour12();
 
         println!(
             "{}{:02}:{:02}:{:02}{}{}{}{}{}",
@@ -59,7 +59,7 @@ pub async fn get_token_price_info(
     token_address: &str,
     buy_price: U256,
 ) -> (U256, f64) {
-    let token_price = get_token_price(web3m, router_address, token_address).await;
+    let token_price = web3m.get_token_price(router_address, token_address).await;
     let price_change_percent =
         calc_price_change_percent(wei_to_eth(buy_price, 18), wei_to_eth(token_price, 18));
 
@@ -77,25 +77,6 @@ pub async fn hit_take_profit_or_stop_loss(
     )
 }
 
-pub async fn get_token_price(
-    web3m: &mut Web3Manager,
-    router_address: &str,
-    token_address: &str,
-) -> U256 {
-    let path_address: Vec<&str> = vec![
-        token_address,
-        "0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd", // BNB
-    ];
-    let mut addresses = Vec::new();
-    for pair in path_address {
-        addresses.push(Address::from_str(pair).unwrap());
-    }
-
-    let token_price: U256 = web3m.get_token_price(router_address, addresses).await;
-
-    token_price
-}
-
 pub async fn check_before_buy(
     web3m: &mut Web3Manager,
     account: H160,
@@ -107,8 +88,6 @@ pub async fn check_before_buy(
     let token_lp_address = web3m
         .find_lp_pair(factory_address.as_str(), token_address)
         .await;
-    println!("Factory Address {}", factory_address.as_str());
-    println!("LP Pair Address {}", token_lp_address.as_str());
 
     // 1. CHECK IF TOKEN HAS LIQUIDITY
     check_has_liquidity(web3m, token_lp_address.as_str()).await;
@@ -134,8 +113,23 @@ pub async fn check_trading_enable(
     let max_slippage = 99usize;
 
     while !is_enabled {
-        println!("{}", "Checking fees percentages".yellow());
-        println!("{}", router_address);
+        let now = Utc::now();
+        let (_, hour) = now.hour12();
+
+        println!(
+            "{}{:02}:{:02}:{:02}{}{}{}{}{} slippage {}",
+            "[".yellow(),
+            hour.to_string().cyan(),
+            now.minute().to_string().cyan(),
+            now.second().to_string().cyan(),
+            "]".yellow(),
+            "[".yellow(),
+            "TRADING ACTIVE".cyan(),
+            "]".yellow(),
+            is_enabled,
+            slippage
+        );
+
         if slippage <= max_slippage {
             let tx_result = web3m
                 .swap_eth_for_exact_tokens(
@@ -150,8 +144,12 @@ pub async fn check_trading_enable(
             if tx_result.is_ok() {
                 is_enabled = true;
                 println!("{}", "BUY OK".green());
-                let token_balance = web3m.get_token_balance(token_address, account).await;
-                println!("Token Balance {}", wei_to_eth(token_balance, 18));
+                println!(
+                    "Tx Hash {}",
+                    w3h::to_string(&tx_result.unwrap())
+                        .replace("\"", "")
+                        .as_str()
+                );
             } else {
                 println!("{}", tx_result.err().unwrap().to_string().red());
                 slippage += 1;
@@ -161,23 +159,6 @@ pub async fn check_trading_enable(
                     exit(0);
                 }
             }
-
-            let now = Utc::now();
-            let (is_pm, hour) = now.hour12();
-
-            println!(
-                "{}{:02}:{:02}:{:02}{}{}{}{}{} slippage {}",
-                "[".yellow(),
-                hour.to_string().cyan(),
-                now.minute().to_string().cyan(),
-                now.second().to_string().cyan(),
-                "]".yellow(),
-                "[".yellow(),
-                "TRADING ACTIVE".cyan(),
-                "]".yellow(),
-                is_enabled,
-                slippage
-            );
 
             //let ten_millis = time::Duration::from_secs(1);
             //thread::sleep(ten_millis);
@@ -199,7 +180,7 @@ pub async fn do_real_sell(
     let mut sell_tx_ok: bool = false;
 
     //let token_balance = web3m.get_token_balance(token_address, account).await;
-    let (token_price, price_change_percent) =
+    let (mut token_price, mut price_change_percent) =
         get_token_price_info(web3m, router_address, token_address, buy_price).await;
     let mut last_token_price = token_price;
     let mut price_hit_take_profit_ath = false;
@@ -208,7 +189,7 @@ pub async fn do_real_sell(
         clear_screen();
 
         // GET TOKEN PRICE AND CHANGE PERCENTAGE
-        let (token_price, price_change_percent) =
+        (token_price, price_change_percent) =
             get_token_price_info(web3m, router_address, token_address, buy_price).await;
 
         let ath_price_change_percent =
@@ -224,7 +205,7 @@ pub async fn do_real_sell(
             token_ath_price = token_price;
         }
 
-        // CHECK IF TOKEN PERCENT HITS ATH TAKE PROFIT
+        // CHECK IF TOKEN PRICE HITS ATH TAKE PROFIT
         if ath_price_change_percent < ath_take_profit_percent {
             price_hit_take_profit_ath = true
         }
@@ -239,7 +220,7 @@ pub async fn do_real_sell(
 
         // LOG
         let now = Utc::now();
-        let (is_pm, hour) = now.hour12();
+        let (_, hour) = now.hour12();
         println!("");
         println!(
             "[{:02}:{:02}:{:02}] - Price: {} BNB | ATH: {} BNB | Change: {} | ATH Change: {}",
@@ -254,24 +235,24 @@ pub async fn do_real_sell(
 
         // STOP ATH
         if price_hit_take_profit_ath {
-            println!("{}", "TAKE PROFIT ATH".green());
             sell_all(web3m, account, router_address, token_address).await;
+            println!("{}", "TAKE PROFIT ATH".green());
             println!("take_profit_ath_price: {:?}", token_price);
             sell_tx_ok = true;
         }
 
-        // TAKE PROFIT LOSS
+        // TAKE PROFIT
         if price_hit_take_profit {
-            println!("{}", "TAKE PROFIT".green());
             sell_all(web3m, account, router_address, token_address).await;
+            println!("{}", "TAKE PROFIT".green());
             println!("take_profit_price: {:?}", token_price);
             sell_tx_ok = true;
         }
 
         // STOP LOSS
         if price_hit_stop_loss {
-            println!("{}", "STOP LOSS".red());
             sell_all(web3m, account, router_address, token_address).await;
+            println!("{}", "STOP LOSS".red());
             println!("sell_stop_loss_price: {:?}", token_price);
             sell_tx_ok = true;
         }
@@ -286,12 +267,12 @@ pub async fn do_real_buy(
     token_address: &str,
     invest_amount: U256,
 ) -> U256 {
-    let mut is_enabled: bool = false;
+    let mut is_purchased: bool = false;
     let mut buy_price = U256::from_str("0").unwrap();
     let mut slippage = 1usize;
     println!("do_real_buy");
-    while !is_enabled {
-        buy_price = get_token_price(web3m, router_address, token_address).await;
+    while !is_purchased {
+        buy_price = web3m.get_token_price(router_address, token_address).await;
 
         let tx_result = web3m
             .swap_eth_for_exact_tokens(
@@ -304,15 +285,13 @@ pub async fn do_real_buy(
             .await;
 
         if tx_result.is_ok() {
-            is_enabled = true;
-            let token_balance = web3m.get_token_balance(token_address, account).await;
-            println!("Token Balance {}", wei_to_eth(token_balance, 18));
+            is_purchased = true;
         } else {
             println!("{}", tx_result.err().unwrap().to_string().red());
         }
 
         let now = Utc::now();
-        let (is_pm, hour) = now.hour12();
+        let (_, hour) = now.hour12();
 
         println!(
             "{}{:02}:{:02}:{:02}{}{}{}{}{}",
@@ -322,9 +301,9 @@ pub async fn do_real_buy(
             now.second().to_string().cyan(),
             "]".yellow(),
             "[".yellow(),
-            "TRADING ACTIVE".cyan(),
+            "IS PURCHASED".cyan(),
             "]".yellow(),
-            is_enabled,
+            is_purchased,
         );
         slippage += 1;
     }
@@ -338,16 +317,35 @@ pub async fn check_honeypot(
     token_address: &str,
 ) -> bool {
     let mut is_honey_pot: bool = true;
-    do_approve(web3m, token_address, router_address, account).await;
+
+    let mut token_balance = web3m.get_token_balance(token_address, account).await;
+
+    while token_balance == U256::from_str("0").unwrap() {
+        let now = Utc::now();
+        let (_, hour) = now.hour12();
+
+        println!(
+            "{}{:02}:{:02}:{:02}{}{}{}{}{}",
+            "[".yellow(),
+            hour.to_string().cyan(),
+            now.minute().to_string().cyan(),
+            now.second().to_string().cyan(),
+            "]".yellow(),
+            "[".yellow(),
+            "TOKEN BALANCE".cyan(),
+            "]".yellow(),
+            token_balance
+        );
+
+        token_balance = web3m.get_token_balance(token_address, account).await;
+    }
 
     while is_honey_pot {
-        let token_balance = web3m.get_token_balance(token_address, account).await;
-        println!("Token Balance {}", wei_to_eth(token_balance, 18));
+        do_approve(web3m, token_address, router_address, account).await;
 
-        let path_address: Vec<&str> = vec![
-            token_address,
-            "0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd", // BNB
-        ];
+        let router_contract = web3m.init_router(router_address).await;
+        let weth_address = web3m.get_weth_address(&router_contract).await;
+        let path_address: Vec<&str> = vec![token_address, weth_address.as_str()];
 
         let tx_result = web3m
             .swap_exact_tokens_for_tokens_supporting_fee_on_transfer_tokens(
@@ -359,8 +357,8 @@ pub async fn check_honeypot(
             .await;
 
         if tx_result.is_ok() {
-            println!("{}", "Buy Tx Completed Successfully".green());
-            println!("buy tx {:?}", tx_result.unwrap());
+            println!("{}", "Sell Tx Completed Successfully".green());
+            println!("sell tx {:?}", tx_result.unwrap());
 
             is_honey_pot = false;
         } else {
@@ -368,7 +366,7 @@ pub async fn check_honeypot(
         }
 
         let now = Utc::now();
-        let (is_pm, hour) = now.hour12();
+        let (_, hour) = now.hour12();
 
         println!(
             "{}{:02}:{:02}:{:02}{}{}{}{}{}",
@@ -396,19 +394,14 @@ pub async fn sell_all(
     token_address: &str,
 ) {
     let mut sell_ok: bool = false;
-    //do_approve(web3m, token_address, router_address, account).await;
     let router_contract = web3m.init_router(router_address).await;
 
-    let weth_address = web3m.get_weth_address(router_contract).await;
+    let weth_address = web3m.get_weth_address(&router_contract).await;
 
     while !sell_ok {
         let token_balance = web3m.get_token_balance(token_address, account).await;
-        println!("Token Balance {}", wei_to_eth(token_balance, 18));
 
-        let path_address: Vec<&str> = vec![
-            token_address,
-            weth_address.as_str(),
-        ];
+        let path_address: Vec<&str> = vec![token_address, weth_address.as_str()];
 
         let tx_result = web3m
             .swap_exact_tokens_for_tokens_supporting_fee_on_transfer_tokens(
@@ -429,8 +422,7 @@ pub async fn sell_all(
     }
 }
 
-pub async fn get_env_variables() -> (String, String, String, String, f64, f64, f64, f64, f64) {
-    let account_puk = env::var("ACCOUNT_ADDRESS").unwrap();
+pub async fn get_env_variables() -> (String, String, String, f64, f64, f64, f64, f64) {
     let account_prk = env::var("PRIVATE_TEST_KEY").unwrap();
     let router_address = env::var("ROUTER_ADDRESS").unwrap();
     let token_address = env::var("TOKEN_ADDRESS").unwrap();
@@ -444,7 +436,7 @@ pub async fn get_env_variables() -> (String, String, String, String, f64, f64, f
     ath_take_profit_percent = -ath_take_profit_percent;
 
     println!("--- ENVIRONMENT VARIABLES ---");
-    println!("account_puk {}", account_puk);
+
     println!("account_prk {}", account_prk);
     println!("router_address {}", router_address);
     println!("token_address {}", token_address);
@@ -456,7 +448,6 @@ pub async fn get_env_variables() -> (String, String, String, String, f64, f64, f
     println!("--- ENVIRONMENT VARIABLES ---\n");
 
     return (
-        account_puk,
         account_prk,
         router_address,
         token_address,

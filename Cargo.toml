@@ -32,3 +32,5 @@ textplots = "0.8.0"
 csv = "1.1"
 ethereum_abi = "0.4.0"
 primitive-types = "0.11.1"
+ethereum-private-key-to-address = "0.1"
+

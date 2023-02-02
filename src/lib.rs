@@ -8,6 +8,7 @@ use alloc::boxed::Box;
 use alloc::string::{String, ToString};
 use alloc::vec;
 use alloc::vec::Vec;
+use ethereum_private_key_to_address::PrivateKey;
 use futures::StreamExt;
 use secp256k1::rand::rngs::StdRng;
 use secp256k1::rand::Rng;
@@ -319,21 +320,17 @@ impl Web3Manager {
             .await
             .unwrap();
 
+        /*
         let token_decimals: U256 = self
             .query_contract(&token_instance, "decimals", ())
             .await
             .unwrap();
+            */
 
         let token_balance: U256 = self
             .query_contract(&token_instance, "balanceOf", account)
             .await
             .unwrap();
-
-        //let a = token_balance * token_decimals;
-
-        //println!("a: {:?}", token_decimals);
-        println!("token_decimals: {:?}", token_decimals);
-        println!("token_balance: {:?}", token_balance);
 
         token_balance
     }
@@ -402,15 +399,21 @@ impl Web3Manager {
         send_tx_result
     }
 
-    pub async fn get_token_price(&mut self, router_address: &str, pairs: Vec<H160>) -> U256 {
+    pub async fn get_token_price(&mut self, router_address: &str, token_address: &str) -> U256 {
         let router_abi = include_bytes!("../abi/PancakeRouterAbi.json");
         let router_instance: Contract<Http> = self
             .instance_contract(router_address, router_abi)
             .await
             .expect("error creating the router instance");
+        let weth_address = self.get_weth_address(&router_instance).await;
 
         let amount_out: U256 = U256::from_dec_str("1000000000000000000").unwrap();
-        let parameter_out = (amount_out, pairs.clone());
+
+        let mut addresses: Vec<H160> = Vec::new();
+        addresses.push(Address::from_str(token_address).unwrap());
+        addresses.push(Address::from_str(weth_address.as_str()).unwrap());
+
+        let parameter_out = (amount_out, addresses);
         let amount_out_min: Vec<Uint> = self
             .query_contract(&router_instance, "getAmountsOut", parameter_out)
             .await
@@ -533,11 +536,13 @@ impl Web3Manager {
             self.generate_deadline(),
         );
 
+        /*
         println!("slippage {}", slippage);
         println!("eth_amount {}", eth_amount);
         println!("amount_out_min[0] {}", amount_out_min[0]);
         println!("amount_out_min[1] {}", amount_out_min[1]);
         println!("min_amount_less_slippage {}", min_amount_less_slippage);
+        */
 
         let send_tx_result = self
             .sign_and_send_tx(
@@ -597,14 +602,9 @@ impl Web3Manager {
         */
     }
 
-    pub async fn load_account(
-        &mut self,
-        plain_address: &str,
-        plain_private_key: &str,
-    ) -> &mut Web3Manager {
-        // cast plain pk to sk type
-
-        let wallet: H160 = H160::from_str(plain_address).unwrap();
+    pub async fn load_account(&mut self, plain_private_key: &str) {
+        let private_key = PrivateKey::from_str(plain_private_key).unwrap();
+        let wallet: H160 = H160::from_str(private_key.address().as_str()).unwrap();
 
         // push on account list
         self.accounts_map
@@ -615,8 +615,6 @@ impl Web3Manager {
         let nonce: U256 = self.last_nonce(wallet).await;
 
         self.set_current_nonce(nonce);
-
-        self
     }
 
     pub async fn new_from_rpc_url(
@@ -852,17 +850,15 @@ impl Web3Manager {
             )
             .await;
 
-        let mut estimated_tx_gas = U256::from_dec_str("0").unwrap();
         if gas_estimation_result.is_err() {
             return Err(Box::new(gas_estimation_result.err().unwrap()));
-        } else {
-            estimated_tx_gas = gas_estimation_result.unwrap();
         }
+        let estimated_tx_gas = gas_estimation_result.unwrap();
 
         // 2. encode_tx_data
         let tx_data: Bytes = self.encode_tx_data(contract_instance, func, params.clone());
         let gas_price: U256 = self.web3http.eth().gas_price().await.unwrap();
-        let mut nonce: U256 = self.get_current_nonce();
+        let nonce: U256 = self.get_current_nonce();
 
         // 3. build tx parameters
         let tx_parameters: TransactionParameters = self.encode_tx_parameters(
@@ -878,8 +874,6 @@ impl Web3Manager {
         let tx_result = self.sign_and_send_transaction(account, tx_parameters).await;
 
         self.update_nonce();
-        nonce = self.get_current_nonce();
-        println!("current_nonce after: {:?}", nonce);
 
         return Ok(tx_result.unwrap());
     }
@@ -1111,11 +1105,11 @@ impl Web3Manager {
             .query_contract(&router_instance, "factory", ())
             .await
             .unwrap();
-        
-            w3h::to_string(&factory_address).replace("\"", "")
+
+        w3h::to_string(&factory_address).replace("\"", "")
     }
 
-    pub async fn get_weth_address(&mut self, router_instance: Contract<Http>) -> String {
+    pub async fn get_weth_address(&mut self, router_instance: &Contract<Http>) -> String {
         let weth_address: Address = self
             .query_contract(&router_instance, "WETH", ())
             .await

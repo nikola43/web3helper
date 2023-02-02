@@ -10,7 +10,6 @@ async fn main() -> web3::Result<()> {
     dotenv::dotenv().ok();
 
     let (
-        account_puk,
         account_prk,
         router_address,
         token_address,
@@ -27,7 +26,7 @@ async fn main() -> web3::Result<()> {
 
     // INITIALIZE ACCOUNT
     web3m
-        .load_account(account_puk.as_str(), account_prk.as_str())
+        .load_account(account_prk.as_str())
         .await;
     let account: H160 = web3m.first_loaded_account();
 
