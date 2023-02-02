@@ -1,0 +1,10 @@
+{
+    "account_prk": "89dce0cf15ed9c165f0b8aeac1d12145c730fa1f4b4bc7ad0c10b6f689a8cc86",
+    "router_address": "0xD99D1c33F9fC3444f8101754aBC46c52416550D1",
+    "token_address": "0x40A03D8C28ebe87092704630E230F113274ECb2c",
+    "invest_amount": 0.001,
+    "max_slipage": 10,
+    "stop_loss": -5,
+    "take_profit_percent": 90,
+    "ath_take_profit_percent": -5
+}

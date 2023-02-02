@@ -1,33 +1,36 @@
-
 pub mod utils;
 
+use serde::Deserialize;
 pub use utils::*;
 use web3::types::H160;
 use web3_rust_wrapper::Web3Manager;
+
+#[derive(Debug, Deserialize)]
+pub struct BotConfig {
+    pub account_prk: String,
+    pub router_address: String,
+    pub token_address: String,
+    pub invest_amount: f64,
+    pub max_slipage: f64,
+    pub stop_loss: f64,
+    pub take_profit_percent: f64,
+    pub ath_take_profit_percent: f64,
+}
 
 #[tokio::main]
 async fn main() -> web3::Result<()> {
     dotenv::dotenv().ok();
 
-    let (
-        account_prk,
-        router_address,
-        token_address,
-        invest_amount,
-        max_slipage,
-        stop_loss,
-        take_profit_percent,
-        ath_take_profit_percent
-    ) = get_env_variables().await;
+    let file = std::fs::File::open("config.json").unwrap();
+
+    // LOAD CONFIG FROM JSON FILE
+    let config: BotConfig = serde_json::from_reader(file).unwrap();
 
     // INITIALIZE Web3Manager
-    let mut web3m: Web3Manager = Web3Manager::new(web3_rust_wrapper::Network::BSCTestnet)
-    .await;
+    let mut web3m: Web3Manager = Web3Manager::new(web3_rust_wrapper::Network::BSCTestnet).await;
 
     // INITIALIZE ACCOUNT
-    web3m
-        .load_account(account_prk.as_str())
-        .await;
+    web3m.load_account(config.account_prk.as_str()).await;
     let account: H160 = web3m.first_loaded_account();
 
     // 1. CHECK IF TOKEN HAS LIQUIDITY
@@ -37,8 +40,8 @@ async fn main() -> web3::Result<()> {
     check_before_buy(
         &mut web3m,
         account,
-        router_address.as_str(),
-        token_address.as_str(),
+        config.router_address.as_str(),
+        config.token_address.as_str(),
     )
     .await;
 
@@ -46,9 +49,9 @@ async fn main() -> web3::Result<()> {
     let buy_price = do_real_buy(
         &mut web3m,
         account,
-        router_address.as_str(),
-        token_address.as_str(),
-        eth_to_wei(invest_amount, 18),
+        config.router_address.as_str(),
+        config.token_address.as_str(),
+        eth_to_wei(config.invest_amount, 18),
     )
     .await;
     clear_screen();
@@ -57,12 +60,12 @@ async fn main() -> web3::Result<()> {
     do_real_sell(
         &mut web3m,
         account,
-        token_address.as_str(),
-        router_address.as_str(),
-        take_profit_percent,
-        stop_loss,
+        config.token_address.as_str(),
+        config.router_address.as_str(),
+        config.take_profit_percent,
+        config.stop_loss,
         buy_price,
-        ath_take_profit_percent
+        config.ath_take_profit_percent,
     )
     .await;
 
