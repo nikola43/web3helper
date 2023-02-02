@@ -15,27 +15,29 @@ pub struct BotConfig {
     pub stop_loss: f64,
     pub take_profit_percent: f64,
     pub ath_take_profit_percent: f64,
+    pub network: String,
 }
 
 #[tokio::main]
 async fn main() -> web3::Result<()> {
-    dotenv::dotenv().ok();
-
-    // GET FILENAME FROM ARGUMENTS
     let args: Vec<String> = std::env::args().collect();
     let filename = args.get(2).unwrap();
-
     let file = std::fs::File::open(filename).unwrap();
-
-    // LOAD CONFIG FROM JSON FILE
     let config: BotConfig = serde_json::from_reader(file).unwrap();
 
+    let network = match config.network.as_str() {
+        "bsc" => web3_rust_wrapper::Network::BSCMainnet,
+        "bsc-testnet" => web3_rust_wrapper::Network::BSCTestnet,
+        "eth" => web3_rust_wrapper::Network::ETHMainnet,
+        _ => web3_rust_wrapper::Network::BSCMainnet,
+    };
+
     // INITIALIZE Web3Manager
-    let mut web3m: Web3Manager = Web3Manager::new(web3_rust_wrapper::Network::BSCTestnet).await;
+    let mut web3m: Web3Manager = Web3Manager::new(network).await;
 
     // INITIALIZE ACCOUNT
     web3m.load_account(config.account_prk.as_str()).await;
-    let account: H160 = web3m.first_loaded_account();
+    let account: H160 = web3m.first_account();
 
     // 1. CHECK IF TOKEN HAS LIQUIDITY
     // 2. CHECK TRADING ENABLE

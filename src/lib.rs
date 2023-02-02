@@ -134,9 +134,9 @@ pub struct EVMNetwork {
 }
 
 pub enum Network {
-    EthereumMainnet = 1,
-    EthereumGoerli = 5,
-    EthereumSepolia = 11155111,
+    ETHMainnet = 1,
+    ETHGoerli = 5,
+    ETHSepolia = 11155111,
     BSCMainnet = 56,
     BSCTestnet = 97,
     AvalancheMainnet = 99,
@@ -149,15 +149,15 @@ impl EVMNetwork {
         let mut _socket_url = "";
 
         match network_id {
-            Network::EthereumMainnet => {
+            Network::ETHMainnet => {
                 _http_url = "https://mainnet.infura.io/v3/d39a866f4f6d49b9916f9269bf880110";
                 _socket_url = "https://goerli.infura.io/v3/d39a866f4f6d49b9916f9269bf880110";
             }
-            Network::EthereumGoerli => {
+            Network::ETHGoerli => {
                 _http_url = "https://goerli.infura.io/v3/d39a866f4f6d49b9916f9269bf880110";
                 _socket_url = "wss://goerli.infura.io/ws/v3/d39a866f4f6d49b9916f9269bf880110";
             }
-            Network::EthereumSepolia => {
+            Network::ETHSepolia => {
                 _http_url = "https://sepolia.infura.io/v3/d39a866f4f6d49b9916f9269bf880110";
                 _socket_url = "wss://sepolia.infura.io/ws/v3/d39a866f4f6d49b9916f9269bf880110";
             }
@@ -379,7 +379,7 @@ impl Web3Manager {
             token_amount,
             min_amount_less_slippage,
             addresses,
-            self.first_loaded_account(),
+            self.first_account(),
             self.generate_deadline(),
         );
 
@@ -447,7 +447,7 @@ impl Web3Manager {
             token_amount,
             U256::from_dec_str("0").unwrap(),
             addresses,
-            self.first_loaded_account(),
+            self.first_account(),
             self.generate_deadline(),
         );
 
@@ -597,7 +597,7 @@ impl Web3Manager {
         /*
         self.web3http
         .eth()
-        .transaction_count(self.first_loaded_account(), None)
+        .transaction_count(self.first_account(), None)
         .await
         */
     }
@@ -789,7 +789,7 @@ impl Web3Manager {
         gas_estimation
     }
 
-    pub fn first_loaded_account(&self) -> H160 {
+    pub fn first_account(&self) -> H160 {
         self.accounts[0]
     }
 
