@@ -25,6 +25,9 @@ async fn main() -> web3::Result<()> {
     let file = std::fs::File::open(filename).unwrap();
     let config: BotConfig = serde_json::from_reader(file).unwrap();
 
+    let mut price_history: Vec<(f32, f32)> = Vec::new();
+
+
     let network = match config.network.as_str() {
         "bsc" => web3_rust_wrapper::Network::BSCMainnet,
         "bsc-testnet" => web3_rust_wrapper::Network::BSCTestnet,
@@ -72,6 +75,7 @@ async fn main() -> web3::Result<()> {
         config.stop_loss,
         buy_price,
         config.ath_take_profit_percent,
+        &mut price_history
     )
     .await;
 

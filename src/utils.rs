@@ -6,6 +6,8 @@ use std::env;
 use std::process::exit;
 use std::str::FromStr;
 use std::thread;
+use std::time::{SystemTime, UNIX_EPOCH};
+use textplots::{Chart, Plot, Shape};
 use web3::ethabi::Uint;
 use web3::helpers as w3h;
 use web3::types::{Address, H160, H256, U256};
@@ -176,6 +178,7 @@ pub async fn do_real_sell(
     stop_loss_percent: f64,
     buy_price: U256,
     ath_take_profit_percent: f64,
+    price_history: &mut Vec<(f32, f32)>,
 ) -> bool {
     let mut sell_tx_ok: bool = false;
 
@@ -219,6 +222,32 @@ pub async fn do_real_sell(
         .await;
 
         // LOG
+        clear_screen();
+        // convert token_price to f32
+        let token_price_f32 = wei_to_eth(token_price, 18) as f32;
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        //price_history.push((token_price_f32 as f32, timestamp as f32));
+
+        // push token price to vector
+
+        /*
+        println!(
+            "Price History: {:?}",
+            price_history.get(price_history.len() - 1)
+        );
+        */
+
+        /*
+        price_history.push((token_price_f32, timestamp as f32));
+        Chart::default()
+            .lineplot(&Shape::Lines(&price_history))
+            .display();
+            */
+
+        
         let now = Utc::now();
         let (_, hour) = now.hour12();
         println!("");
