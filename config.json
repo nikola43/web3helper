@@ -1,11 +1,11 @@
 {
     "account_prk": "",
     "router_address": "0x10ED43C718714eb63d5aA57B78B54704E256024E",
-    "token_address": "0x0F90c255A65AA6a06c889287D13d978c9079F23A",
+    "token_address": "0x8bD417A9C17a3DdE7Ec1107228385aB45b05abE8",
     "invest_amount": 0.01,
     "max_slipage": 10,
     "stop_loss": -3,
-    "take_profit_percent": 20,
+    "take_profit_percent": 5,
     "ath_take_profit_percent": -4,
     "network": "bsc"
 }

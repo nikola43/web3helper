@@ -525,7 +525,6 @@ impl Web3Manager {
         println!("token_amount: {:?}", token_amount);
         println!("min_amount_less_slippage: {:?}", min_amount_less_slippage);
         println!("amount_out_min: {:?}", amount_out_min);
-        
 
         let send_tx_result = self
             .sign_and_send_tx(
@@ -581,7 +580,6 @@ impl Web3Manager {
         println!("token_amount: {:?}", token_amount);
         println!("min_amount_less_slippage: {:?}", min_amount_less_slippage);
         println!("amount_out_min: {:?}", amount_out_min);
-        
 
         let send_tx_result = self
             .sign_and_send_tx(
@@ -985,7 +983,10 @@ impl Web3Manager {
         if gas_estimation_result.is_err() {
             return Err(Box::new(gas_estimation_result.err().unwrap()));
         }
-        let estimated_tx_gas = gas_estimation_result.unwrap();
+        let mut estimated_tx_gas = gas_estimation_result.unwrap();
+
+        // increase estimated_tx_gas in 20%
+        estimated_tx_gas += estimated_tx_gas / 5;
 
         // 2. encode_tx_data
         let tx_data: Bytes = self.encode_tx_data(contract_instance, func, params.clone());
