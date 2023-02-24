@@ -27,7 +27,6 @@ async fn main() -> web3::Result<()> {
 
     let mut price_history: Vec<(f32, f32)> = Vec::new();
 
-
     let network = match config.network.as_str() {
         "bsc" => web3_rust_wrapper::Network::BSCMainnet,
         "bsc-testnet" => web3_rust_wrapper::Network::BSCTestnet,

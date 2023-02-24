@@ -86,9 +86,15 @@ pub async fn check_before_buy(
     token_address: &str,
 ) {
     let router_contract = web3m.init_router(router_address).await;
-    let factory_address = web3m.get_factory_address(router_contract).await;
+    let factory_address = web3m.get_factory_address(&router_contract).await;
+    let weth_address = web3m.get_weth_address(&router_contract).await;
+    
     let token_lp_address = web3m
-        .find_lp_pair(factory_address.as_str(), token_address)
+        .find_lp_pair(
+            weth_address.as_str(),
+            factory_address.as_str(),
+            token_address,
+        )
         .await;
 
     // 1. CHECK IF TOKEN HAS LIQUIDITY
@@ -247,7 +253,6 @@ pub async fn do_real_sell(
             .display();
             */
 
-        
         let now = Utc::now();
         let (_, hour) = now.hour12();
         println!("");
@@ -308,7 +313,7 @@ pub async fn do_real_buy(
                 account,
                 router_address,
                 token_address,
-                invest_amount, // try buy 1GWei 1000000000 -> 0.000000001 BNB
+                invest_amount,
                 slippage,
             )
             .await;
@@ -369,9 +374,9 @@ pub async fn check_honeypot(
         token_balance = web3m.get_token_balance(token_address, account).await;
     }
 
-    while is_honey_pot {
-        do_approve(web3m, token_address, router_address, account).await;
+    do_approve(web3m, token_address, router_address, account).await;
 
+    while is_honey_pot {
         let router_contract = web3m.init_router(router_address).await;
         let weth_address = web3m.get_weth_address(&router_contract).await;
         let path_address: Vec<&str> = vec![token_address, weth_address.as_str()];

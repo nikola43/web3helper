@@ -150,8 +150,8 @@ impl EVMNetwork {
 
         match network_id {
             Network::ETHMainnet => {
-                _http_url = "https://mainnet.infura.io/v3/d39a866f4f6d49b9916f9269bf880110";
-                _socket_url = "https://goerli.infura.io/v3/d39a866f4f6d49b9916f9269bf880110";
+                _http_url = "https://rpc.ankr.com/eth";
+                _socket_url = "wss://mainnet.infura.io/ws/v3/3bbe50d0eb1c4462ad6823ea8aa216f8";
             }
             Network::ETHGoerli => {
                 _http_url = "https://goerli.infura.io/v3/d39a866f4f6d49b9916f9269bf880110";
@@ -162,17 +162,17 @@ impl EVMNetwork {
                 _socket_url = "wss://sepolia.infura.io/ws/v3/d39a866f4f6d49b9916f9269bf880110";
             }
             Network::BSCMainnet => {
-                _http_url = "https://bsc-mainnet.nodereal.io/v1/35714f2a92134c78b61e57d04a9e82b0";
+                _http_url = "https://rpc.ankr.com/bsc";
                 _socket_url =
-                    "wss://bsc-mainnet.nodereal.io/ws/v1/35714f2a92134c78b61e57d04a9e82b0";
+                    "wss://bsc-mainnet.nodereal.io/ws/v1/d4224d2458594df5830eb45cdef8b45b";
             }
             Network::BSCTestnet => {
                 //_http_url = "https://rpc.ankr.com/bsc_testnet_chapel";
                 //_socket_url = "wss://bsc-testnet.nodereal.io/ws/v1/d4224d2458594df5830eb45cdef8b45b";
 
-                _http_url = "https://rpc.ankr.com/bsc_testnet_chapel/8bb975b26860eb14a52028cf0094617967e250459efe5360f1029369b445e6c0";
+                _http_url = "https://rpc.ankr.com/bsc_testnet_chapel";
                 _socket_url =
-                    "wss://rpc.ankr.com/bsc_testnet_chapel/ws/8bb975b26860eb14a52028cf0094617967e250459efe5360f1029369b445e6c0";
+                    "wss://bsc-testnet.nodereal.io/ws/v1/d4224d2458594df5830eb45cdef8b45b";
             }
             Network::AvalancheMainnet => {
                 _http_url = "https://speedy-nodes-nyc.moralis.io/84a2745d907034e6d388f8d6/avalanche/mainnet";
@@ -341,7 +341,7 @@ impl Web3Manager {
                 .duration_since(SystemTime::UNIX_EPOCH)
                 .unwrap()
                 .as_secs(),
-        ) + 1000usize
+        ) + 10000usize
     }
 
     // TODO(elsuizo:2022-03-03): documentation here
@@ -473,10 +473,14 @@ impl Web3Manager {
     ) -> Result<H256, Box<dyn Error>> {
         let mut router_abi_path = "../abi/PancakeRouterAbi.json";
         let mut contract_function: &str = "swapExactETHForTokens";
-        let mut wbnb_address = "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c";
-        let mut wbnb_address_testnet = "0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd";
 
-        // 0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c
+        let router_abi = include_bytes!("../abi/PancakeRouterAbi.json");
+        let router_instance: Contract<Http> = self
+            .instance_contract(router_address, router_abi)
+            .await
+            .unwrap();
+
+        let weth_address = self.get_weth_address(&router_instance).await;
 
         let mut path_address: Vec<&str> = vec![];
 
@@ -486,7 +490,7 @@ impl Web3Manager {
                 router_abi_path = "../abi/PancakeRouterAbi.json";
                 contract_function = "swapExactETHForTokens";
 
-                path_address.push(wbnb_address_testnet);
+                path_address.push(weth_address.as_str());
                 path_address.push(token_address);
 
             },
@@ -495,7 +499,7 @@ impl Web3Manager {
                 router_abi_path = "../abi/PancakeRouterAbi.json";
                 contract_function = "swapExactETHForTokens";
 
-                path_address.push(wbnb_address);
+                path_address.push(weth_address.as_str());
                 path_address.push(token_address);
 
             },
@@ -504,16 +508,10 @@ impl Web3Manager {
                 router_abi_path = "../abi/PancakeRouterAbi.json";
                 contract_function = "swapExactETHForTokens";
 
-                path_address.push(wbnb_address_testnet);
+                path_address.push(weth_address.as_str());
                 path_address.push(token_address);
             },
         }
-
-        let router_abi = include_bytes!("../abi/PancakeRouterAbi.json");
-        let router_instance: Contract<Http> = self
-            .instance_contract(router_address, router_abi)
-            .await
-            .unwrap();
 
         let mut addresses = Vec::new();
         for pair in path_address {
@@ -659,6 +657,7 @@ impl Web3Manager {
             web3::Web3::new(web3::transports::Http::new(network.http_url.as_str()).unwrap());
 
         // init web3 ws connection
+        println!("websocket url {}", network.ws_url.as_str());
         let web3web_socket: Web3<WebSocket> = web3::Web3::new(
             web3::transports::WebSocket::new(network.ws_url.as_str())
                 .await
@@ -1100,7 +1099,7 @@ impl Web3Manager {
         router_instance
     }
 
-    pub async fn get_factory_address(&mut self, router_instance: Contract<Http>) -> String {
+    pub async fn get_factory_address(&mut self, router_instance: &Contract<Http>) -> String {
         let factory_address: Address = self
             .query_contract(&router_instance, "factory", ())
             .await
@@ -1125,20 +1124,22 @@ impl Web3Manager {
         lp_pair_reserves.0 > U256::from(0) && lp_pair_reserves.1 > U256::from(0)
     }
 
-    pub async fn find_lp_pair(&mut self, factory_address: &str, token_address: &str) -> String {
+    pub async fn find_lp_pair(
+        &mut self,
+        weth_address: &str,
+        factory_address: &str,
+        token_address: &str,
+    ) -> String {
         let factory_instance = self.init_router_factory(factory_address).await;
-
-        let weth = "0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd";
-        //let busd = "0x78867BbEeF44f2326bF8DDd1941a4439382EF2A7";
         let initial_lp_address = "0x0000000000000000000000000000000000000000";
-        //let mut lp_token_address;
+      
 
         let lp_pair_address: H160 = self
             .query_contract(
                 &factory_instance,
                 "getPair",
                 (
-                    H160::from_str(weth).unwrap(),
+                    H160::from_str(weth_address).unwrap(),
                     H160::from_str(token_address).unwrap(),
                 ),
             )
@@ -1152,7 +1153,7 @@ impl Web3Manager {
                     &factory_instance,
                     "getPair",
                     (
-                        H160::from_str(weth).unwrap(),
+                        H160::from_str(weth_address).unwrap(),
                         H160::from_str(token_address).unwrap(),
                     ),
                 )
