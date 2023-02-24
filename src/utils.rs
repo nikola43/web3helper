@@ -88,7 +88,7 @@ pub async fn check_before_buy(
     let router_contract = web3m.init_router(router_address).await;
     let factory_address = web3m.get_factory_address(&router_contract).await;
     let weth_address = web3m.get_weth_address(&router_contract).await;
-    
+
     let token_lp_address = web3m
         .find_lp_pair(
             weth_address.as_str(),
@@ -374,19 +374,31 @@ pub async fn check_honeypot(
         token_balance = web3m.get_token_balance(token_address, account).await;
     }
 
-    do_approve(web3m, token_address, router_address, account).await;
+    let router_address_h160: H160 = H160::from_str(router_address).unwrap();
+    let mut token_allowance = web3m
+        .get_token_allowance(token_address, account, router_address_h160)
+        .await;
+
+    if token_allowance == U256::from_str("0").unwrap() {
+        do_approve(web3m, token_address, router_address, account).await;
+
+        while token_allowance == U256::from_str("0").unwrap() {
+            token_allowance = web3m
+                .get_token_allowance(token_address, account, router_address_h160)
+                .await;
+        }
+    }
 
     while is_honey_pot {
-        let router_contract = web3m.init_router(router_address).await;
-        let weth_address = web3m.get_weth_address(&router_contract).await;
-        let path_address: Vec<&str> = vec![token_address, weth_address.as_str()];
+        let slipagge = 10usize;
 
         let tx_result = web3m
-            .swap_exact_tokens_for_tokens_supporting_fee_on_transfer_tokens(
+            .swap_exact_tokens_for_eth_supporting_fee_on_transfer_tokens(
                 account,
                 router_address,
+                token_address,
                 token_balance, // 1 token,
-                &path_address,
+                slipagge,
             )
             .await;
 
@@ -428,21 +440,19 @@ pub async fn sell_all(
     token_address: &str,
 ) {
     let mut sell_ok: bool = false;
-    let router_contract = web3m.init_router(router_address).await;
 
-    let weth_address = web3m.get_weth_address(&router_contract).await;
+    let slippage = 10usize;
 
     while !sell_ok {
         let token_balance = web3m.get_token_balance(token_address, account).await;
 
-        let path_address: Vec<&str> = vec![token_address, weth_address.as_str()];
-
         let tx_result = web3m
-            .swap_exact_tokens_for_tokens_supporting_fee_on_transfer_tokens(
+            .swap_exact_tokens_for_eth_supporting_fee_on_transfer_tokens(
                 account,
                 router_address,
+                token_address,
                 token_balance,
-                &path_address,
+                slippage,
             )
             .await;
 

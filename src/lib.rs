@@ -399,6 +399,26 @@ impl Web3Manager {
         send_tx_result
     }
 
+    pub async fn get_token_allowance(
+        &self,
+        token_address: &str,
+        account: H160,
+        spender: H160,
+    ) -> U256 {
+        let token_abi = include_bytes!("../abi/TokenAbi.json");
+        let token_instance: Contract<Http> = self
+            .instance_contract(token_address, token_abi)
+            .await
+            .unwrap();
+
+        let token_allowance: U256 = self
+            .query_contract(&token_instance, "allowance", (account, spender))
+            .await
+            .unwrap();
+
+        token_allowance
+    }
+
     pub async fn get_token_price(&mut self, router_address: &str, token_address: &str) -> U256 {
         let router_abi = include_bytes!("../abi/PancakeRouterAbi.json");
         let router_instance: Contract<Http> = self
@@ -447,7 +467,7 @@ impl Web3Manager {
             token_amount,
             U256::from_dec_str("0").unwrap(),
             addresses,
-            self.first_account(),
+            account,
             self.generate_deadline(),
         );
 
@@ -463,6 +483,119 @@ impl Web3Manager {
 
         send_tx_result
     }
+
+    pub async fn swap_exact_tokens_for_eth(
+        &mut self,
+        account: H160,
+        router_address: &str,
+        token_address: &str,
+        token_amount: U256,
+        slippage: usize,
+    ) -> Result<H256, Box<dyn Error>> {
+        let contract_function: &str = "swapExactTokensForETH";
+
+        let router_abi = include_bytes!("../abi/PancakeRouterAbi.json");
+        let router_instance: Contract<Http> = self
+            .instance_contract(router_address, router_abi)
+            .await
+            .expect("error creating the router instance");
+        let weth_address = self.get_weth_address(&router_instance).await;
+
+        let mut addresses: Vec<H160> = Vec::new();
+        addresses.push(Address::from_str(token_address).unwrap());
+        addresses.push(Address::from_str(weth_address.as_str()).unwrap());
+
+        let parameter_out = (token_amount, addresses.clone());
+        let amount_out_min: Vec<Uint> = self
+            .query_contract(&router_instance, "getAmountsOut", parameter_out)
+            .await
+            .unwrap();
+
+        let min_amount = U256::from(amount_out_min[1].as_u128());
+        let min_amount_less_slippage = min_amount - ((min_amount * slippage) / 100);
+
+        let parameters = (
+            token_amount,
+            min_amount_less_slippage,
+            addresses,
+            account,
+            self.generate_deadline(),
+        );
+
+        println!("token_amount: {:?}", token_amount);
+        println!("min_amount_less_slippage: {:?}", min_amount_less_slippage);
+        println!("amount_out_min: {:?}", amount_out_min);
+        
+
+        let send_tx_result = self
+            .sign_and_send_tx(
+                account,
+                &router_instance,
+                contract_function,
+                &parameters,
+                U256::from_dec_str("0").unwrap(),
+            )
+            .await;
+
+        send_tx_result
+    }
+
+    pub async fn swap_exact_tokens_for_eth_supporting_fee_on_transfer_tokens(
+        &mut self,
+        account: H160,
+        router_address: &str,
+        token_address: &str,
+        token_amount: U256,
+        slippage: usize,
+    ) -> Result<H256, Box<dyn Error>> {
+        let contract_function: &str = "swapExactTokensForETHSupportingFeeOnTransferTokens";
+
+        let router_abi = include_bytes!("../abi/PancakeRouterAbi.json");
+        let router_instance: Contract<Http> = self
+            .instance_contract(router_address, router_abi)
+            .await
+            .expect("error creating the router instance");
+        let weth_address = self.get_weth_address(&router_instance).await;
+
+        let mut addresses: Vec<H160> = Vec::new();
+        addresses.push(Address::from_str(token_address).unwrap());
+        addresses.push(Address::from_str(weth_address.as_str()).unwrap());
+
+        let parameter_out = (token_amount, addresses.clone());
+        let amount_out_min: Vec<Uint> = self
+            .query_contract(&router_instance, "getAmountsOut", parameter_out)
+            .await
+            .unwrap();
+
+        let min_amount = U256::from(amount_out_min[1].as_u128());
+        let min_amount_less_slippage = min_amount - ((min_amount * slippage) / 100);
+
+        let parameters = (
+            token_amount,
+            min_amount_less_slippage,
+            addresses,
+            account,
+            self.generate_deadline(),
+        );
+
+        println!("token_amount: {:?}", token_amount);
+        println!("min_amount_less_slippage: {:?}", min_amount_less_slippage);
+        println!("amount_out_min: {:?}", amount_out_min);
+        
+
+        let send_tx_result = self
+            .sign_and_send_tx(
+                account,
+                &router_instance,
+                contract_function,
+                &parameters,
+                U256::from_dec_str("0").unwrap(),
+            )
+            .await;
+
+        send_tx_result
+    }
+
     pub async fn swap_eth_for_exact_tokens(
         &mut self,
         account: H160,
@@ -1132,7 +1265,6 @@ impl Web3Manager {
     ) -> String {
         let factory_instance = self.init_router_factory(factory_address).await;
         let initial_lp_address = "0x0000000000000000000000000000000000000000";
-      
 
         let lp_pair_address: H160 = self
             .query_contract(
